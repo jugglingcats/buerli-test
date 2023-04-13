@@ -1,10 +1,10 @@
 import {Canvas} from "@react-three/fiber";
 import {OrbitControls} from "@react-three/drei";
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useState} from "react";
 import {ApiHistory, history} from "@buerli.io/headless";
 import {BrepElemType, init, SocketIOClient} from "@buerli.io/classcad";
-import * as THREE from "three";
 import styled from "styled-components";
+import {BuerliGeometry, useBuerli} from "@buerli.io/react";
 
 const StyledDiv = styled.div`
   width: 100vw;
@@ -14,22 +14,24 @@ const StyledDiv = styled.div`
   flex-direction: column;
 `
 
-init((id) => new SocketIOClient('ws://localhost:8081', id))
+init((id) => new SocketIOClient('ws://localhost:8081', id), {
+    config: {geometry: {points: {hidden: true}, edges: {color: 'black'}}},
+})
 const cad = new history()
 
 function App() {
     const [api, setApi] = useState<ApiHistory>()
     const [part, setPart] = useState<number | null>()
+    const drawingId = useBuerli(state => state.drawing.active)
 
-    const scene=useRef<THREE.Scene>(new THREE.Scene())
+    // const scene=useRef<THREE.Scene>(new THREE.Scene())
     useEffect(() => {
         cad.init(async api => {
-            const part = await api.createPart('part')
-            await api.box(part, [], 1, 1, 1)
-            const createdScene = await api.createScene(part)
-            scene.current.copy(createdScene.scene)
+            const buffer=await fetch("/Ventil.stp").then(r=>r.arrayBuffer())
+            const importedIds = await api.load(buffer, "stp")
+
             setApi(api)
-            setPart(part)
+            setPart(importedIds![0])
         })
     }, [])
 
@@ -38,10 +40,9 @@ function App() {
             return
         }
         console.log("find on part", part)
-        await api.findOrSelect(part, BrepElemType.EDGE, 1, null).finally(() => {
-            console.log("find done")
-        })
-        console.log("after find")
+        const ids=await api.findOrSelect(part, BrepElemType.EDGE, 1, null)
+        const item=await api.getAssemblyNode(ids![0])
+        console.log("after find", ids, item)
     }
 
     return (
@@ -52,8 +53,8 @@ function App() {
             <Canvas>
                 <ambientLight/>
                 <OrbitControls makeDefault/>
-
-                <primitive object={scene.current}/>
+                <group>{drawingId && <BuerliGeometry drawingId={drawingId}/>}</group>
+                {/* <primitive object={scene.current}/> */}
             </Canvas>
         </StyledDiv>
     )
