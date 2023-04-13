@@ -33,14 +33,15 @@ function App() {
         })
     }, [])
 
-    function do_find() {
+    async function do_find() {
         if (!api || !part) {
             return
         }
         console.log("find on part", part)
-        api.findOrSelect(part, BrepElemType.EDGE, 1, null).finally(() => {
+        await api.findOrSelect(part, BrepElemType.EDGE, 1, null).finally(() => {
             console.log("find done")
         })
+        console.log("after find")
     }
 
     return (
