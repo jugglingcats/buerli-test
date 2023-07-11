@@ -1,10 +1,11 @@
 import {Canvas} from "@react-three/fiber";
-import {OrbitControls} from "@react-three/drei";
+import {OrbitControls, PerspectiveCamera} from "@react-three/drei";
 import {useEffect, useState} from "react";
-import {ApiHistory, history} from "@buerli.io/headless";
-import {BrepElemType, init, SocketIOClient} from "@buerli.io/classcad";
+import {ApiHistory, history, } from "@buerli.io/headless";
+import {init, SocketIOClient} from "@buerli.io/classcad";
 import styled from "styled-components";
 import {BuerliGeometry, useBuerli} from "@buerli.io/react";
+import { GraphicType } from "@buerli.io/core"
 
 const StyledDiv = styled.div`
   width: 100vw;
@@ -17,32 +18,31 @@ const StyledDiv = styled.div`
 init((id) => new SocketIOClient('ws://localhost:8081', id), {
     config: {geometry: {points: {hidden: true}, edges: {color: 'black'}}},
 })
+
+// noinspection JSPotentiallyInvalidConstructorUsage
 const cad = new history()
 
 function App() {
     const [api, setApi] = useState<ApiHistory>()
-    const [part, setPart] = useState<number | null>()
-    const drawingId = useBuerli(state => state.drawing.active)
+    const drawing = useBuerli(state => state.drawing)
 
-    // const scene=useRef<THREE.Scene>(new THREE.Scene())
     useEffect(() => {
         cad.init(async api => {
+            // const buffer=await fetch("/RobotCellAssembly.ofb").then(r=>r.arrayBuffer())
             const buffer=await fetch("/Ventil.stp").then(r=>r.arrayBuffer())
-            const importedIds = await api.load(buffer, "stp")
+            await api.load(buffer, "stp")
 
             setApi(api)
-            setPart(importedIds![0])
         })
     }, [])
 
     async function do_find() {
-        if (!api || !part) {
-            return
-        }
-        console.log("find on part", part)
-        const ids=await api.findOrSelect(part, BrepElemType.EDGE, 1, null)
-        const item=await api.getAssemblyNode(ids![0])
-        console.log("after find", ids, item)
+        const info = await api!.selectGeometry([GraphicType.POINT, GraphicType.PLANE])
+        console.log("info", info)
+    }
+
+    if ( !drawing.active ) {
+        return null
     }
 
     return (
@@ -52,9 +52,9 @@ function App() {
             </div>
             <Canvas>
                 <ambientLight/>
+                <PerspectiveCamera makeDefault position={[50,-200,100]} />
                 <OrbitControls makeDefault/>
-                <group>{drawingId && <BuerliGeometry drawingId={drawingId}/>}</group>
-                {/* <primitive object={scene.current}/> */}
+                <BuerliGeometry drawingId={drawing.active}/>
             </Canvas>
         </StyledDiv>
     )
